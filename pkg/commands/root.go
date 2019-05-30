@@ -22,16 +22,15 @@ package commands
 
 import (
 	"fmt"
+	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	"net/url"
 	"strings"
 	"v3io-backup/internal/pkg/performance"
 	"v3io-backup/pkg/config"
 	"v3io-backup/pkg/utils"
-
-	"github.com/nuclio/logger"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	"github.com/spf13/cobra/doc"
 )
 
 type CmdRoot struct {
@@ -40,7 +39,6 @@ type CmdRoot struct {
 	cmd         *cobra.Command
 	v3ioUrl     string
 	container   string
-	path        string
 	cfgFilePath string
 	logLevel    string
 	username    string
@@ -64,12 +62,6 @@ func NewCmdRoot() (*CmdRoot, error) {
 	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "",
 		"Verbose output. Add \"=<level>\" to set the log level -\ndebug | info | warn | error. For example: -v=warn.\n(default - \""+config.DefaultLogLevel+"\" when using the flag; \""+config.DefaultLogLevel+"\" otherwise)")
 	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = config.DefaultLogLevel
-	cmd.PersistentFlags().StringVarP(&commandeer.path, "path", "d", "",
-		"[Required] Path to backup within the configured\ndata container. Examples: \"/my-data\"; \"/tsdb/table-1\".")
-	// We don't enforce this flag (commands.MarkFlagRequired("table-path")),
-	// although it's documented as Required, because this flag isn't required
-	// for the hidden `time` command + during internal tests we might want to
-	// configure the table path in a configuration file.
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioUrl, "server", "s", "",
 		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Continuous Data Platform, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
@@ -83,18 +75,13 @@ func NewCmdRoot() (*CmdRoot, error) {
 	cmd.PersistentFlags().StringVarP(&commandeer.accessKey, "access-key", "k", "",
 		"Access-key for accessing the required table.\nIf access-key is passed, it will take precedence on user/password authentication.")
 
+	commandeer.cmd = cmd
+
 	// Add children
 	cmd.AddCommand(
 		newVersionCmd(commandeer).cmd,
+		newBackupCmd(commandeer).cmd,
 	)
-
-	logger, err := utils.NewLogger(commandeer.logLevel)
-	if err != nil {
-		return nil, err
-	}
-
-	commandeer.logger = logger
-	commandeer.cmd = cmd
 
 	return commandeer, nil
 }
@@ -150,17 +137,11 @@ func (rc *CmdRoot) populateConfig(cfg *config.Config) error {
 	if rc.container != "" {
 		cfg.Container = rc.container
 	}
-	if rc.path != "" {
-		cfg.Path = rc.path
-	}
 	if cfg.WebApiEndpoint == "" {
 		return errors.New("web API endpoint must be set")
 	}
 	if cfg.Container == "" {
 		return errors.New("container must be set")
-	}
-	if cfg.Path == "" {
-		return errors.New("table path must be set")
 	}
 	if rc.logLevel != "" {
 		cfg.LogLevel = rc.logLevel
@@ -168,6 +149,13 @@ func (rc *CmdRoot) populateConfig(cfg *config.Config) error {
 		cfg.LogLevel = config.DefaultLogLevel
 	}
 
+	if rc.logger == nil {
+		newLogger, err := utils.NewLogger(rc.logLevel)
+		if err != nil {
+			return err
+		}
+		rc.logger = newLogger
+	}
 	// Prefix http:// in case that WebApiEndpoint is a pseudo-URL missing a scheme (for backward compatibility).
 	amendedWebApiEndpoint, err := buildUrl(cfg.WebApiEndpoint)
 	if err == nil {

@@ -6,6 +6,7 @@ require (
 	github.com/imdario/mergo v0.3.7
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
+	github.com/nuclio/errors v0.0.1
 	github.com/nuclio/logger v0.0.1
 	github.com/nuclio/zap v0.0.2
 	github.com/pkg/errors v0.8.1

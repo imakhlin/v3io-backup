@@ -25,7 +25,8 @@ BACKUP_BIN_NAME := v3io-backup-$(GIT_REVISION)-$(GOOS)-$(GOARCH)
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Use fully qualified package name
-CONFIG_PKG=github.com/v3io/v3io-backup/pkg/config
+#CONFIG_PKG=github.com/v3io/v3io-backup/pkg/config
+CONFIG_PKG=github.com/imakhlin/v3io-backup/pkg/config
 
 # Use Go linker to set the build metadata
 BUILD_OPTS := -ldflags " \
@@ -37,6 +38,7 @@ BUILD_OPTS := -ldflags " \
   -X $(CONFIG_PKG).branch=$(GIT_BRANCH)" \
  -v -o "$(GOPATH)/bin/$(BACKUP_BIN_NAME)"
 
+
 BACKUP_BUILD_COMMAND ?= GO111MODULE=on CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/main.go
 
 .PHONY: get
@@ -45,15 +47,11 @@ get:
 
 .PHONY: test
 test: get
-	go test -race -tags unit -count 1 $(TOPLEVEL_DIRS)
+	GO111MODULE=on go test -race -tags unit -count 1 $(TOPLEVEL_DIRS)
 
 .PHONY: integration
 integration: get
 	go test -race -tags integration -p 1 -count 1 $(TOPLEVEL_DIRS) # p=1 to force Go to run pkg tests serially.
-
-.PHONY: bench
-bench: get
-	go test -run=XXX -bench='^BenchmarkIngest$$' -benchtime 10s -timeout 5m ./test/benchmark/...
 
 .PHONY: build
 build:

@@ -56,6 +56,5 @@ func newVersionCmd(rc *CmdRoot) *cmdVersion {
 	}
 
 	commandeer.cmd = cmd
-
 	return commandeer
 }

@@ -52,6 +52,12 @@ type BuildInfo struct {
 	Branch       string `json:"branch,omitempty"`
 }
 
+type BackupOptions struct {
+	Paths          Paths  `json:"paths"`
+	ExcludeFilters Paths  `json:"excludeFilters"`
+	Repository     string `json:"repository"`
+}
+
 func (bi *BuildInfo) String() string {
 	return fmt.Sprintf("Build time: %s\nOS: %s\nArchitecture: %s\nVersion: %s\nCommit Hash: %s\nBranch: %s\n",
 		bi.BuildTime,
@@ -84,13 +90,13 @@ func Error() error {
 	return failure
 }
 
+type Paths [] string
 type Config struct {
 	// V3IO connection information - web-gateway service endpoint,
 	// The data container, relative path within the container, and
 	// authentication credentials for the web-gateway service
 	WebApiEndpoint string `json:"webApiEndpoint"`
 	Container      string `json:"container"`
-	Path           string `json:"path"`
 	Username       string `json:"username,omitempty"`
 	Password       string `json:"password,omitempty"`
 	AccessKey      string `json:"accessKey,omitempty"`
@@ -102,7 +108,6 @@ type Config struct {
 	ScannerParallelism int `json:"scannerParallelism"`
 	// Default timeout duration, in seconds; default = 3,600 seconds (1 hour)
 	DefaultTimeoutInSeconds int `json:"defaultTimeoutInSeconds,omitempty"`
-
 	// Desired size of single index file
 	IndexFileSizeLimit int `json:"indexFileSizeLimit,omitempty"`
 	// Desired size of single pack file
@@ -111,6 +116,8 @@ type Config struct {
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
 	// Build Info
 	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
+	// Backup Options
+	BackupOptions BackupOptions `json:"backupOptions,omitempty"`
 }
 
 type MetricsReporterConfig struct {
@@ -288,5 +295,11 @@ func initDefaults(cfg *Config) {
 
 	if cfg.Password == "" {
 		cfg.Password = os.Getenv("V3IO_PASSWORD")
+	}
+
+	// Development mode
+	if ! cfg.MetricsReporter.ReportOnShutdown {
+		cfg.MetricsReporter.ReportOnShutdown = true
+		cfg.MetricsReporter.Output = "stdout"
 	}
 }
