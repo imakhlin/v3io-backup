@@ -163,7 +163,7 @@ func newMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIn
 	}
 
 	reporter := MetricReporter{
-		registry:              metrics.NewPrefixedRegistry("v3io-tsdb -> "),
+		registry:              metrics.NewPrefixedRegistry("v3io-backup -> "),
 		logWriter:             writer,
 		running:               true,
 		reportPeriodically:    reportPeriodically,

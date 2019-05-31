@@ -66,7 +66,7 @@ instead of using the -s|--server, -u|--username, -p|--password, and -c|--contain
 	return commandeer
 }
 
-func (bc *cmdBackup) backup() error {
+func (bc *cmdBackup) backup() (error error) {
 
 	if bc.targetRepo == "" {
 		return errors.New("The backup command must receive target repository parameters (set via the -r|--repo flag).")
@@ -93,16 +93,19 @@ func (bc *cmdBackup) backup() error {
 	logger.InfoWith("Backup", "source", bc.rootCommandeer.v3ioUrl, "paths", bc.paths, "filter", bc.excludeFilters,
 		"target repository", bc.targetRepo, "username", bc.rootCommandeer.username, "access-key", bc.rootCommandeer.accessKey, "log-level", bc.rootCommandeer.logLevel)
 
-	ds, err := v3io.NewDataSource(bc.rootCommandeer.cfg)
+	bc.rootCommandeer.Reporter.WithTimer("Backup", func() {
+		ds, err := v3io.NewDataSource(bc.rootCommandeer.cfg)
 
-	if err != nil {
-		return err
-	}
+		if err != nil {
+			error = err
+		}
 
-	err = ds.Connect()
-	if err != nil {
-		return err
-	}
+		_, err = ds.ListDir(bc.paths)
+		if err != nil {
+			error = err
+		}
 
-	return nil
+		error = nil
+	})
+	return
 }

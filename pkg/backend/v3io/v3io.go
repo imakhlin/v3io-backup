@@ -1,7 +1,6 @@
 package v3io
 
 import (
-	"fmt"
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
 	v3io "github.com/v3io/v3io-go/pkg/dataplane"
@@ -22,21 +21,26 @@ type V3ioDataSource struct {
 }
 
 func (vds *V3ioDataSource) Connect() error {
-	// TODO: find better and lighter test
-	path := normalisePath(vds.cfg.BackupOptions.Paths[0])
-	fullpath := fmt.Sprintf("%s/%s%s", vds.cfg.WebApiEndpoint, vds.cfg.Container, path)
-	resp, err := vds.container.GetContainerContentsSync(&v3io.GetContainerContentsInput{Path: path})
+	path := "/"
+	response, err := vds.container.GetContainerContentsSync(&v3io.GetContainerContentsInput{Path: path})
+	defer releaseResponse(response)
+
 	if err != nil {
 		if v3ioUtils.IsNotExistsError(err) {
 			return errors.Errorf("File found at container '%s' at path '%s'.", vds.cfg.WebApiEndpoint, path)
 		} else {
-			return errors.Wrapf(err, "Failed to read from '%s'.", fullpath)
+			return errors.Wrapf(err, "Failed to read from '%s/%s%s'.", vds.cfg.WebApiEndpoint, vds.cfg.Container, path)
 		}
 	}
 
-	vds.logger.InfoWith("Connect Response", "Body", string(resp.Body()))
-
+	vds.logger.Info("Connected to container '%s' at '%s'", vds.cfg.Container, vds.cfg.WebApiEndpoint)
 	return nil
+}
+
+func releaseResponse(response *v3io.Response) {
+	if response != nil {
+		response.Release()
+	}
 }
 
 func normalisePath(path string) string {
@@ -47,13 +51,40 @@ func normalisePath(path string) string {
 }
 
 func (vds *V3ioDataSource) Disconnect() error {
-	return errors.Errorf("Not implemented: Disconnect")
+	vds.logger.Info("Not implemented: Disconnect")
+	return nil
 }
 
-func (vds *V3ioDataSource) ListDir(path string) (*FileInfoIterator, error) {
+func (vds *V3ioDataSource) ListDir(paths []string) (*FileInfoIterator, error) {
+	if vds.cfg.BackupOptions.Paths == nil {
+		return nil, errors.Errorf("Backup cannot continue without path. Path(s) not set.")
+	}
+
+	// TODO: Implement with async iterator
+	/* Example
+	path := normalisePath(vds.cfg.BackupOptions.Paths[0])
+	resp, err := vds.container.GetContainerContentsSync(&v3io.GetContainerContentsInput{Path: path})
+	defer releaseResponse(resp)
+
+	if err != nil {
+		if v3ioUtils.IsNotExistsError(err) {
+			return errors.Errorf("File found at container '%s' at path '%s'.", vds.cfg.WebApiEndpoint, path)
+		} else {
+			return errors.Wrapf(err, "Failed to read from '%s/%s%s'.", vds.cfg.WebApiEndpoint, vds.cfg.Container, path)
+		}
+	}
+
+	result := ListBucketResult{}
+	xml.Unmarshal(resp.Body(), &result)
+
+	vds.logger.InfoWith("Connect Response", "Result", result, "Rows count", len(result.Contents))
+	*/
+
 	return nil, errors.Errorf("Not implemented: ListDir")
 }
-func (vds *V3ioDataSource) Scan(path string, modifiedAfterTime time.Time) (*FileInfoIterator, error) {
+
+func (vds *V3ioDataSource) Scan(paths []string, modifiedAfterTime time.Time) (*FileInfoIterator, error) {
+	// TODO: Implement with async iterator
 	return nil, errors.Errorf("Not implemented: Scan")
 }
 
@@ -85,8 +116,14 @@ func newV3ioDataSource(cfg *config.Config, container v3io.Container, logger logg
 		}
 	}
 
-	//err = ds.Connect()
-	return &ds, err
+	// Test connection
+	err = ds.Connect()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &ds, nil
 }
 
 func parseHttpTimeout(cfg *config.Config, logger logger.Logger) time.Duration {
